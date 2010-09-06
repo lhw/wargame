@@ -1,3 +1,4 @@
+/* by lwi */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,4 +14,6 @@ main(int argc, char **argv) {
 	printf(buf);
 	if(magic == 1337)
 		system("/bin/sh");
+	
+	return 0;
 }

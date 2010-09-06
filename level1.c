@@ -10,4 +10,6 @@ int main(int argc, char **argv, char **envp) {
 		return -1;
 	printf("%x\n", envp[0]);
 	strcpy(buffer, argv[1]);
+
+	return 0;
 }

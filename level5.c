@@ -6,13 +6,11 @@
 #include <string.h>
 
 uint32_t crc32(unsigned char *input) {
-	uint32_t result = ~0, xormask[] = { 0x00000000, 0xedb88320 }, length = strlen(input), i;
+	uint32_t result = ~0, xormask[] = { 0, 0xedb88320 }, length = strlen(input), i;
 	
-	while(length--) {
-		result ^= *(input++);
-		for(i = 0; i < 8; i++)
+	while(length--)
+		for(i = 8, result ^= *(input++); i; i--)
 			result = (result >> 1) ^ xormask[result & 1];
-	}
 
 	return ~result;
 }
@@ -91,4 +89,6 @@ int main(int argc, char **argv) {
 	printf("program 1 (%x):\n%s\n\nprogram 2 (%x):\n%s\n\n", cksum[0], output1, cksum[1], output2);
 	if(strcmp(wanted[0], output1) == 0 && strcmp(wanted[1], output2) == 0 && cksum[0] == cksum[1])
 		system("/bin/sh");
+
+	return 0;
 }
