@@ -1,4 +1,4 @@
-all: level1 level2 level4 level5
+all: level1 level2 level4 level5 level6
 
 clean:
 	rm /home/level1/level1*
