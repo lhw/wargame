@@ -12,7 +12,7 @@ build:
 code:
 	cp level1.c /home/level1/
 	cp level2.c /home/level2/
-	cat level3.c | sed "s;lxcc7EQaMfIeW8Kdxz5I;xxxxxxxxxxxxxxxxxx;g" > /home/level3/level3.c
+	cat level3.c | sed "s;lxcc7EQaMfIeW8Kdxz5I;xxxxxxxxxxxxxxxxxx;g" | sed "s/int a;//g" | sed "s/return a;//g" > /home/level3/level3.c
 	cp level4.c /home/level4/
 
 chmod:
