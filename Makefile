@@ -30,7 +30,7 @@ chmod:
 	chmod 4550 /home/level4/level4
 	#
 	chown endgame:level5 /home/level5/level5
-	chmod 4110 /home/level3/level3
+	chmod 4110 /home/level5/level5
 
 
 clean:
