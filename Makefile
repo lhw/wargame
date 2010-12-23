@@ -5,7 +5,7 @@ LEVELS = level1 level2 level3 level4 level5
 
 build:
 	@for file in $(LEVELS) ; do \
-		gcc-3.4 -D_FORTIFY_SOURCE=0 -Wpadded -z execstack -o $$file $$file.c ; \
+		gcc-3.4 -D_FORTIFY_SOURCE=0 -O0 -Wpadded -z execstack -o $$file $$file.c ; \
 		mv $$file /home/$$file/ ; \
 	done
 
