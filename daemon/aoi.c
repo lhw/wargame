@@ -6,6 +6,11 @@
 #include <netinet/in.h>
 #include <dirent.h>
 #include <err.h>
+#include <pwd.h>
+
+#ifndef __OpenBSD__
+#include <getopt.h>
+#endif
      
 #define CMD_GAME	1
 #define CMD_HELP	2
@@ -14,13 +19,17 @@
 #define CMD_NONE	0
 
 int port = 5000;
-char *dir = "./pics/";
+char *chrootdir = "/tmp/aoi";
+char *filesdir = ".";
+char *user = "nobody";
+char *passfile = "pass";
+
+char arg[5]; /* for the exploit; assumption: command + \0 = 5 chars */
 
 static const struct cmd {
 	const char *cmd;
 	int code;
 } cmds[] = {
-	{ "game",	CMD_GAME },
 	{ "help",	CMD_HELP },
 	{ "list",	CMD_LIST },
 	{ "view",	CMD_VIEW }
@@ -30,7 +39,7 @@ void
 usage(void)
 {
 	extern char *__progname;
-	fprintf(stderr, "usage: %s [-h] [-d dir] [-p port]\n",
+	fprintf(stderr, "usage: %s [-dh] [-c chroot_dir] [-f files_dir] [-p port]\n",
 		__progname);
 	exit(1);
 }
@@ -51,7 +60,7 @@ dolist(int c)
 	DIR *dirp;
 	struct dirent *dp;
 	char name[1024];
-	if ((dirp = opendir(dir)) == NULL)
+	if ((dirp = opendir(filesdir)) == NULL)
 		err(1, "opendir");
 	while ((dp = readdir(dirp)) != NULL) {
 		snprintf(name, sizeof(name), "%s\n", dp->d_name);
@@ -75,8 +84,13 @@ doview(int c, char *buf)
 		send(c, msg, strlen(msg), 0);
 		return;
 	}
-	snprintf(file, sizeof(file), "%s%s", dir, bufp);
-	
+	snprintf(file, sizeof(file), "%s%s", filesdir, bufp);
+
+	if (strstr(file, passfile)) {
+		char *msg = "permission denied\n";
+		send(c, msg, strlen(msg), 0);
+		return;
+	}
 	if ((fp = fopen(file, "r")) == NULL) {
 		/* err(1, "fopen"); */
 		char *msg = "file not found\n";
@@ -92,7 +106,6 @@ void
 dohelp(int c, char *buf)
 {
 	char *bufp;
-	char arg[5]; /* assumption: command + \0 = 5 chars */
 	
 	/* XXX: crappy code, see also doview() */
 	strsep(&buf, " ");
@@ -113,38 +126,14 @@ dohelp(int c, char *buf)
 			char *msg = "usage: view file\nshows the content of the file\n";
 			send(c, msg, strlen(msg), 0);
 		} else if (strncmp("game", arg, 4) == 0) {
-			char *msg = "usage: game\nwanna play a nice game? ;)\n";
+			char msg[30];
+			sprintf(msg, "hint: address is %p\n", arg);
 			send(c, msg, strlen(msg), 0);
 		} else {
-			char *msg = "unknown command.\navailable commands are: game list view";
+			char *msg = "unknown command.\navailable commands are: help game list view";
 			send(c, msg, strlen(msg), 0);
 		}
 	}
-}
-
-void
-dogame(int c)
-{
-	int n;
-	char buf[256];
-	
-	char *msg = "Greetings, Professor Falken. Shall we play a game?\n";
-	send(c, msg, strlen(msg), 0);
-	
-	if ((n = recv(c, buf, 256, 0)) < 0) {
-		close(c);
-		return;
-	}
-	/* just for obscurity */
-	if (n > 5) {
-		char *msg2 = "exception: exiting.\n";
-		send(c, msg2, strlen(msg2), 0);
-		close(c);
-		return;
-	}
-
-	char *msg3 = "I'm not interested any longer.\nGoodbye\n";
-	send(c, msg3, strlen(msg3), 0);
 }
 
 int
@@ -161,9 +150,6 @@ handlecommand(int c, char *buf)
 	case CMD_HELP:
 		dohelp(c, buf);
 		break;
-	case CMD_GAME:
-		dogame(c);
-		break;
 	case CMD_NONE:
 		send(c, msg, strlen(msg), 0);
 		break;
@@ -173,16 +159,27 @@ handlecommand(int c, char *buf)
 int
 main(int argc, char *argv[])
 {
-	int ch, s;
+	int ch, daemon = 0, s;
+	struct passwd *pw;
 	struct sockaddr_in sin;
+	pid_t pid;
 
-	while ((ch = getopt(argc, argv, "d:hp:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:df:hp:u:")) != -1) {
 		switch (ch) {
+		case 'c':
+			chrootdir = optarg;
+			break;
 		case 'd':
-			dir = optarg;
+			daemon = 1;
+			break;
+		case 'f':
+			filesdir = optarg;
 			break;
 		case 'p':
 			port = atoi(optarg);
+			break;
+		case 'u':
+			user = optarg;
 			break;
 		case '?':
 		case 'h':
@@ -193,14 +190,43 @@ main(int argc, char *argv[])
 
 	if ((s = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 		err(1, "socket");
+
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port);
+
 	if (bind(s, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 		err(1, "bind");
 	if (listen(s, 5) < 0)
 		err(1, "listen");
+
+	if ((pw = getpwnam(user)) == NULL)
+		err(1, "getpwnam");
+
+	if (chroot(chrootdir) < 0)
+		err(1, "chroot");
+	if (chdir("/") < 0)
+		err(1, "chdir");
+
+	if(setgroups(1, &pw->pw_gid) ||
+	   setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) ||
+           setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid))
+		err(1, "can't drop privileges");
+
+	endpwent();
+
+	if (daemon) {
+		switch (pid = fork()) {
+		case -1:
+			err(1, "cannot fork");
+		case 0:
+			break;
+		default:
+			printf("pid: %d\n", pid);
+			exit(0);
+		}
+	}
 
 	for (;;) {
 		int c;
@@ -211,6 +237,11 @@ main(int argc, char *argv[])
 
 		if ((c = accept(s, (struct sockaddr *)&cin, &len)) < 0)
 			err(1, "accept");
+		pid = fork();
+		if (pid < 0)
+			err(1, "fork");
+		if (pid = 0)
+			continue;
 		
 		while ((n = recv(c, buf, sizeof(buf), 0)) > 0) {
 			if (n > 0)
@@ -218,5 +249,6 @@ main(int argc, char *argv[])
 			handlecommand(c, buf);
 			memset(buf, 0, sizeof(buf));
 		}
+		//return;
 	}
 }
