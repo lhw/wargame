@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define MIN(a, b) (a > b ? b : a)
-#define OFFSET 40
+#define OFFSET 28
 
 int main(int argc, char **argv, char **envp) {
 	{	/* force slot for system() in binary, because address of

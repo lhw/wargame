@@ -25,7 +25,7 @@ int bf(char *input, char *output, unsigned int output_len) {
 	unsigned int wp = 0; /* output pointer */
 	unsigned int open_brackets = 0; /* important for loop handling */
 	unsigned int nesting_depth = 0;
-	unsigned int startpoint[nesting_depth];
+	unsigned int startpoint[MAX_LOOP_NESTING];
 
 	bzero(data, sizeof(data));
 	for(pc = 0; pc < length && --max_iterations; pc++) {
